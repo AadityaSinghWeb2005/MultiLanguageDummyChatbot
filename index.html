@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chatbot</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #4f8cff 0%, #e0e7ff 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0;
+        }
+        .chat-container {
+            width: 100vw;
+            height: 100vh;
+            max-width: 100vw;
+            max-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            border-radius: 0;
+            overflow: hidden;
+            background: rgba(255,255,255,0.97);
+            box-shadow: 0 8px 32px rgba(79,140,255,0.12);
+        }
+        .conversation::-webkit-scrollbar {
+            width: 8px;
+        }
+        .conversation::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .conversation::-webkit-scrollbar-thumb {
+            background-color: #b3bff7;
+            border-radius: 10px;
+            border: 2px solid #f1f5f9;
+        }
+        .typing-indicator span {
+            animation: bounce 1s infinite;
+        }
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        @keyframes bounce {
+            0%, 80%, 100% { transform: translateY(0);}
+            40% { transform: translateY(-8px);}
+        }
+        .fade-in {
+            animation: fadeIn 0.7s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px);}
+            to { opacity: 1; transform: translateY(0);}
+        }
+        .timestamp {
+            font-size: 0.75rem;
+            color: #a0aec0;
+            margin-top: 2px;
+            text-align: right;
+        }
+        .message-actions {
+            display: none;
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            z-index: 10;
+        }
+        .bot-bubble:hover .message-actions {
+            display: flex;
+        }
+        .user-bubble:hover .message-actions {
+            display: flex;
+        }
+        .emoji-picker {
+            position: absolute;
+            bottom: 60px;
+            right: 60px;
+            background: #fff;
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+            padding: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            z-index: 50;
+        }
+        .emoji-btn {
+            font-size: 1.3rem;
+            cursor: pointer;
+            background: none;
+            border: none;
+            transition: transform 0.1s;
+        }
+        .emoji-btn:hover {
+            transform: scale(1.2);
+        }
+        @media (max-width: 700px) {
+            .chat-container { border-radius: 0; }
+            .emoji-picker { right: 10px; bottom: 70px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container relative">
+        <!-- Header -->
+        <div class="flex items-center justify-between p-4 bg-gradient-to-r from-blue-600 to-blue-400 text-white shadow-lg">
+            <div class="flex items-center">
+                <div class="p-2 bg-blue-800 rounded-full flex items-center justify-center shadow">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5zm0-6c-1.66 0-3 1.34-3 3h-1.5c0-2.49 2.01-4.5 4.5-4.5s4.5 2.01 4.5 4.5h-1.5c0-1.66-1.34-3-3-3z"/>
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <div class="text-base font-semibold tracking-wide">Support Bot</div>
+                    <div class="text-xs text-green-200 flex items-center">
+                        <span class="w-2 h-2 bg-green-400 rounded-full mr-1"></span>Online
+                    </div>
+                </div>
+            </div>
+            <div class="flex space-x-2">
+                <button class="text-white hover:text-blue-200 transition" title="Minimize">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M20 12H4"/>
+                    </svg>
+                </button>
+                <button class="text-white hover:text-blue-200 transition" title="Close">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Conversation Area -->
+        <div id="conversation-area" class="conversation flex-1 p-4 overflow-y-auto space-y-4 bg-gray-50">
+            <!-- Typing Indicator (initially hidden) -->
+            <div id="typing-indicator" class="flex items-start space-x-2 hidden">
+                <div class="flex-shrink-0 w-8 h-8 rounded-full bg-gray-400 flex items-center justify-center text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                </div>
+                <div class="bg-gray-200 p-3 rounded-xl rounded-tl-none max-w-[80%]">
+                    <div class="typing-indicator flex items-center space-x-1">
+                        <span class="w-2 h-2 bg-gray-500 rounded-full"></span>
+                        <span class="w-2 h-2 bg-gray-500 rounded-full"></span>
+                        <span class="w-2 h-2 bg-gray-500 rounded-full"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Reply Buttons -->
+        <div id="quick-replies" class="p-4 flex flex-wrap gap-2 justify-center"></div>
+        <!-- User typing indicator -->
+        <div id="user-typing-indicator" class="px-4 pb-1 text-xs text-gray-400 hidden">You are typing...</div>
+        <!-- Emoji Picker (hidden by default) -->
+        <div id="emoji-picker" class="emoji-picker hidden"></div>
+        <!-- Input Area -->
+        <div class="p-4 border-t border-gray-200 flex items-center relative">
+            <button id="emoji-toggle" class="mr-2 text-2xl" title="Add emoji">😊</button>
+            <input type="text" id="user-input" class="flex-1 py-2 px-4 rounded-full bg-gray-100 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200" placeholder="Type your message...">
+            <button id="send-btn" class="ml-2 bg-blue-500 text-white p-3 rounded-full hover:bg-blue-600 transition-all duration-200 disabled:bg-blue-300" disabled>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 transform rotate-45 -mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const conversationArea = document.getElementById('conversation-area');
+    const userInput = document.getElementById('user-input');
+    const sendBtn = document.getElementById('send-btn');
+    const quickReplyContainer = document.getElementById('quick-replies');
+    const typingIndicator = document.getElementById('typing-indicator');
+    const userTypingIndicator = document.getElementById('user-typing-indicator');
+    const emojiToggle = document.getElementById('emoji-toggle');
+    const emojiPicker = document.getElementById('emoji-picker');
+
+    // Multi-language support
+    const languages = {
+        en: {
+            name: "English",
+            greeting: "Hello! How can I assist you today?",
+            typing: "You are typing...",
+            default: "I'm sorry, I don't understand that. Could you please rephrase?",
+            quickReplies: ["Billing", "Technical Support", "General Inquiry"],
+            intents: [
+                {
+                    keywords: ["billing", "invoice", "payment"],
+                    response: "Please provide your order number and I can assist with your billing inquiry.",
+                    quickReplies: ["Check invoice", "Update payment method", "Talk to billing agent"],
+                    intent: "billing"
+                },
+                {
+                    keywords: ["technical", "error", "bug", "issue", "problem"],
+                    response: "I can connect you with a technical support agent. Would you like me to do that?",
+                    quickReplies: ["Describe issue", "Restart service", "Talk to tech agent"],
+                    intent: "technical"
+                },
+                {
+                    keywords: ["order", "track", "shipping", "delivery"],
+                    response: "Please provide your order number so I can help you with your order.",
+                    quickReplies: ["Track an order", "Cancel order", "Order status"],
+                    intent: "order"
+                },
+                {
+                    keywords: ["hello", "hi", "hey"],
+                    response: "Hello! How can I assist you today?",
+                    quickReplies: ["Billing", "Technical Support", "General Inquiry"],
+                    intent: "greeting"
+                },
+                {
+                    keywords: ["thanks", "thank you", "thx"],
+                    response: "You're welcome! Is there anything else I can help you with?",
+                    quickReplies: ["No, thanks", "Yes, more help"],
+                    intent: "thanks"
+                },
+                {
+                    keywords: ["agent", "human", "person"],
+                    response: "Connecting you to a live agent. Please wait a moment.",
+                    quickReplies: ["Cancel request"],
+                    intent: "agent"
+                }
+            ]
+        },
+        es: {
+            name: "Español",
+            greeting: "¡Hola! ¿En qué puedo ayudarte hoy?",
+            typing: "Estás escribiendo...",
+            default: "Lo siento, no entiendo eso. ¿Podrías reformularlo?",
+            quickReplies: ["Facturación", "Soporte técnico", "Consulta general"],
+            intents: [
+                {
+                    keywords: ["factura", "pago", "cobro"],
+                    response: "Por favor, proporciona tu número de pedido y te ayudaré con tu consulta de facturación.",
+                    quickReplies: ["Ver factura", "Actualizar método de pago", "Hablar con facturación"],
+                    intent: "billing"
+                },
+                {
+                    keywords: ["técnico", "error", "problema", "bug", "soporte"],
+                    response: "Puedo conectarte con un agente de soporte técnico. ¿Quieres que lo haga?",
+                    quickReplies: ["Describir problema", "Reiniciar servicio", "Hablar con soporte técnico"],
+                    intent: "technical"
+                },
+                {
+                    keywords: ["pedido", "envío", "entrega", "rastrear"],
+                    response: "Por favor, proporciona tu número de pedido para poder ayudarte.",
+                    quickReplies: ["Rastrear pedido", "Cancelar pedido", "Estado del pedido"],
+                    intent: "order"
+                },
+                {
+                    keywords: ["hola", "buenas", "hey"],
+                    response: "¡Hola! ¿En qué puedo ayudarte hoy?",
+                    quickReplies: ["Facturación", "Soporte técnico", "Consulta general"],
+                    intent: "greeting"
+                },
+                {
+                    keywords: ["gracias", "muchas gracias", "agradecido"],
+                    response: "¡De nada! ¿Hay algo más en lo que pueda ayudarte?",
+                    quickReplies: ["No, gracias", "Sí, más ayuda"],
+                    intent: "thanks"
+                },
+                {
+                    keywords: ["agente", "humano", "persona"],
+                    response: "Te conecto con un agente en vivo. Por favor, espera un momento.",
+                    quickReplies: ["Cancelar solicitud"],
+                    intent: "agent"
+                }
+            ]
+        },
+        hi: {
+            name: "हिन्दी",
+            greeting: "नमस्ते! मैं आपकी किस प्रकार सहायता कर सकता हूँ?",
+            typing: "आप टाइप कर रहे हैं...",
+            default: "माफ़ कीजिए, मैं समझ नहीं पाया। कृपया दोबारा लिखें।",
+            quickReplies: ["बिलिंग", "तकनीकी सहायता", "सामान्य पूछताछ"],
+            intents: [
+                {
+                    keywords: ["बिलिंग", "चालान", "भुगतान"],
+                    response: "कृपया अपना ऑर्डर नंबर बताएं, मैं आपकी बिलिंग संबंधी सहायता कर सकता हूँ।",
+                    quickReplies: ["चालान देखें", "भुगतान विधि अपडेट करें", "बिलिंग एजेंट से बात करें"],
+                    intent: "billing"
+                },
+                {
+                    keywords: ["तकनीकी", "त्रुटि", "समस्या", "बग", "सहायता"],
+                    response: "मैं आपको तकनीकी सहायता एजेंट से जोड़ सकता हूँ। क्या आप चाहेंगे?",
+                    quickReplies: ["समस्या बताएं", "सेवा पुनः प्रारंभ करें", "तकनीकी एजेंट से बात करें"],
+                    intent: "technical"
+                },
+                {
+                    keywords: ["ऑर्डर", "ट्रैक", "शिपिंग", "डिलीवरी", "डिलिवरी"],
+                    response: "कृपया अपना ऑर्डर नंबर बताएं ताकि मैं आपकी सहायता कर सकूं।",
+                    quickReplies: ["ऑर्डर ट्रैक करें", "ऑर्डर रद्द करें", "ऑर्डर स्थिति"],
+                    intent: "order"
+                },
+                {
+                    keywords: ["नमस्ते", "हाय", "hello", "सुप्रभात"],
+                    response: "नमस्ते! मैं आपकी किस प्रकार सहायता कर सकता हूँ?",
+                    quickReplies: ["बिलिंग", "तकनीकी सहायता", "सामान्य पूछताछ"],
+                    intent: "greeting"
+                },
+                {
+                    keywords: ["धन्यवाद", "शुक्रिया", "थैंक यू"],
+                    response: "आपका स्वागत है! क्या मैं आपकी और मदद कर सकता हूँ?",
+                    quickReplies: ["नहीं, धन्यवाद", "हाँ, और सहायता चाहिए"],
+                    intent: "thanks"
+                },
+                {
+                    keywords: ["एजेंट", "मानव", "व्यक्ति"],
+                    response: "मैं आपको एक लाइव एजेंट से जोड़ रहा हूँ। कृपया प्रतीक्षा करें।",
+                    quickReplies: ["अनुरोध रद्द करें"],
+                    intent: "agent"
+                }
+            ]
+        }
+    };
+
+    let currentLang = 'en';
+
+    // Language selector
+    const langSelector = document.createElement('select');
+    langSelector.className = "absolute top-4 right-4 bg-white border border-blue-200 rounded px-2 py-1 text-sm shadow";
+    Object.entries(languages).forEach(([code, lang]) => {
+        const opt = document.createElement('option');
+        opt.value = code;
+        opt.textContent = lang.name;
+        langSelector.appendChild(opt);
+    });
+    document.querySelector('.chat-container').appendChild(langSelector);
+
+    function getLangObj() {
+        return languages[currentLang];
+    }
+
+    function detectIntent(userMessage) {
+        const langObj = getLangObj();
+        const lowerMsg = userMessage.toLowerCase();
+        for (const intentObj of langObj.intents) {
+            if (intentObj.keywords.some(keyword => lowerMsg.includes(keyword))) {
+                return intentObj;
+            }
+        }
+        return {
+            response: langObj.default,
+            quickReplies: langObj.quickReplies,
+            intent: "default"
+        };
+    }
+
+    function generateBotResponse(userMessage) {
+        if (typingIndicator.parentNode) {
+            typingIndicator.parentNode.removeChild(typingIndicator);
+        }
+        conversationArea.appendChild(typingIndicator);
+        typingIndicator.classList.remove('hidden');
+        conversationArea.scrollTop = conversationArea.scrollHeight;
+
+        setTimeout(() => {
+            typingIndicator.classList.add('hidden');
+            const intentObj = detectIntent(userMessage);
+            lastIntent = intentObj.intent;
+            createMessage(intentObj.response, false);
+            if (intentObj.quickReplies && intentObj.quickReplies.length > 0) {
+                displayQuickReplies(intentObj.quickReplies);
+            } else {
+                displayQuickReplies(getLangObj().quickReplies);
+            }
+        }, 1200);
+    }
+
+    // Emoji picker data
+    const emojis = ["😀","😁","😂","🤣","😊","😍","😎","😢","😡","👍","🙏","🎉","💡","🚀","❤️","🔥","🤖","🙌","😇","😉"];
+
+    function showEmojiPicker() {
+        emojiPicker.innerHTML = '';
+        emojis.forEach(emoji => {
+            const btn = document.createElement('button');
+            btn.className = 'emoji-btn';
+            btn.textContent = emoji;
+            btn.addEventListener('click', () => {
+                userInput.value += emoji;
+                userInput.focus();
+                emojiPicker.classList.add('hidden');
+                sendBtn.disabled = userInput.value.trim() === '';
+            });
+            emojiPicker.appendChild(btn);
+        });
+        emojiPicker.classList.remove('hidden');
+    }
+
+    emojiToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (emojiPicker.classList.contains('hidden')) {
+            showEmojiPicker();
+        } else {
+            emojiPicker.classList.add('hidden');
+        }
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!emojiPicker.contains(e.target) && e.target !== emojiToggle) {
+            emojiPicker.classList.add('hidden');
+        }
+    });
+
+    function getCurrentTime() {
+        const now = new Date();
+        return now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    }
+
+    function createMessage(text, isUser = false) {
+        const messageDiv = document.createElement('div');
+        const bubbleDiv = document.createElement('div');
+        const timeDiv = document.createElement('div');
+        timeDiv.className = 'timestamp';
+        timeDiv.textContent = getCurrentTime();
+
+        if (isUser) {
+            messageDiv.className = 'flex justify-end fade-in relative';
+            bubbleDiv.className = 'user-bubble bg-blue-500 text-white p-3 rounded-xl rounded-tr-none max-w-[80%] relative shadow';
+        } else {
+            messageDiv.className = 'flex items-start space-x-2 fade-in relative';
+            const botAvatar = document.createElement('div');
+            botAvatar.className = 'flex-shrink-0 w-8 h-8 rounded-full bg-blue-400 flex items-center justify-center text-white shadow';
+            botAvatar.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                                    </svg>`;
+            messageDiv.appendChild(botAvatar);
+            bubbleDiv.className = 'bot-bubble bg-gray-200 text-gray-800 p-3 rounded-xl rounded-tl-none max-w-[80%] relative shadow cursor-pointer group';
+        }
+
+        // Copy-to-clipboard and delete for both user and bot
+        const actions = document.createElement('div');
+        actions.className = 'message-actions space-x-2';
+        // Copy button
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'text-gray-400 hover:text-blue-500 transition';
+        copyBtn.title = "Copy";
+        copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2" stroke-width="2" stroke="currentColor" fill="none"/><rect x="3" y="3" width="13" height="13" rx="2" stroke-width="2" stroke="currentColor" fill="none"/></svg>`;
+        copyBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            navigator.clipboard.writeText(text);
+            copyBtn.title = "Copied!";
+            setTimeout(() => copyBtn.title = "Copy", 1000);
+        });
+        // Delete button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'text-gray-400 hover:text-red-500 transition';
+        deleteBtn.title = "Delete";
+        deleteBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>`;
+        deleteBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            messageDiv.remove();
+        });
+        actions.appendChild(copyBtn);
+        actions.appendChild(deleteBtn);
+
+        bubbleDiv.appendChild(actions);
+
+        // Show actions on hover
+        bubbleDiv.addEventListener('mouseenter', () => actions.style.display = 'flex');
+        bubbleDiv.addEventListener('mouseleave', () => actions.style.display = 'none');
+
+        const p = document.createElement('p');
+        p.textContent = text;
+        bubbleDiv.appendChild(p);
+        bubbleDiv.appendChild(timeDiv);
+        messageDiv.appendChild(bubbleDiv);
+        conversationArea.appendChild(messageDiv);
+
+        conversationArea.scrollTop = conversationArea.scrollHeight;
+    }
+
+    function sendMessage() {
+        const text = userInput.value.trim();
+        if (text === '') return;
+        createMessage(text, true);
+        userInput.value = '';
+        sendBtn.disabled = true;
+        quickReplyContainer.innerHTML = '';
+        userTypingIndicator.classList.add('hidden');
+        generateBotResponse(text);
+        userInput.focus();
+    }
+
+    function displayQuickReplies(replies) {
+        quickReplyContainer.innerHTML = '';
+        const shown = new Set();
+        replies.forEach(reply => {
+            if (!shown.has(reply)) {
+                shown.add(reply);
+                const button = document.createElement('button');
+                button.textContent = reply;
+                button.className = 'quick-reply-btn bg-blue-100 text-blue-700 py-2 px-4 rounded-full text-sm font-medium hover:bg-blue-200 transition-colors duration-200 shadow';
+                button.addEventListener('click', () => {
+                    createMessage(reply, true);
+                    quickReplyContainer.innerHTML = '';
+                    generateBotResponse(reply);
+                });
+                quickReplyContainer.appendChild(button);
+            }
+        });
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+
+    userInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            sendMessage();
+        }
+    });
+
+    userInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            userInput.value = '';
+            sendBtn.disabled = true;
+            userTypingIndicator.classList.add('hidden');
+        }
+    });
+
+    userInput.addEventListener('input', () => {
+        sendBtn.disabled = userInput.value.trim() === '';
+        if (userInput.value.trim() !== '') {
+            userTypingIndicator.textContent = getLangObj().typing;
+            userTypingIndicator.classList.remove('hidden');
+        } else {
+            userTypingIndicator.classList.add('hidden');
+        }
+    });
+
+    // Language selector event
+    langSelector.addEventListener('change', () => {
+        currentLang = langSelector.value;
+        conversationArea.innerHTML = '';
+        conversationArea.appendChild(typingIndicator);
+        typingIndicator.classList.add('hidden');
+        createMessage(getLangObj().greeting, false);
+        displayQuickReplies(getLangObj().quickReplies);
+        userInput.placeholder = currentLang === 'es'
+            ? "Escribe tu mensaje..."
+            : currentLang === 'hi'
+                ? "अपना संदेश लिखें..."
+                : "Type your message...";
+        userTypingIndicator.textContent = getLangObj().typing;
+    });
+
+    // Initial bot greeting and quick replies on page load
+    createMessage(getLangObj().greeting, false);
+    displayQuickReplies(getLangObj().quickReplies);
+    userInput.placeholder = getLangObj().typing === "Estás escribiendo..." ? "Escribe tu mensaje..." : (getLangObj().typing === "आप टाइप कर रहे हैं..." ? "अपना संदेश लिखें..." : "Type your message...");
+    userInput.focus();
+});
+</script>
+</body>
+</html>
